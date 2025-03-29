@@ -1,0 +1,17 @@
+# General
+node_modules/
+dist/
+.DS_Store
+.vscode/
+.idea/
+.env
+
+# Backend (Java)
+backend/target/
+backend/.mvn/
+backend/*.log
+
+# Frontend (React)
+frontend/build/
+frontend/.next/
+frontend/.cache/
