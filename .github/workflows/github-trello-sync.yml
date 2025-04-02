@@ -1,4 +1,4 @@
-- name: Verify Secrets
+name: Verify Secrets
   run: |
     echo "TRELLO_API_KEY length: ${#TRELLO_API_KEY}"
     echo "TRELLO_TOKEN length: ${#TRELLO_TOKEN}"
