@@ -1,0 +1,60 @@
+name: Sync GitHub Issues & PRs with Trello
+
+on:
+  issues:
+    types: [opened, edited, closed]
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  sync_with_trello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Trello API to Create or Move Cards
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          BOARD_ID: "NbN9o1PX"
+          BACKLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
+          READY_LIST_ID: "67e8581d93f6ede88f3eb055"
+          IN_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
+          IN_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
+          DONE_LIST_ID: "67e8581d93f6ede88f3eb056"
+        run: |
+          # Detectar si el evento es un Issue o un Pull Request
+          if [[ "${{ github.event_name }}" == "issues" ]]; then
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+            ISSUE_BODY="${{ github.event.issue.body }}"
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_STATE="${{ github.event.issue.state }}"
+            ISSUE_ACTION="${{ github.event.action }}"
+          else
+            ISSUE_TITLE="${{ github.event.pull_request.title }}"
+            ISSUE_BODY="${{ github.event.pull_request.body }}"
+            ISSUE_NUMBER="${{ github.event.pull_request.number }}"
+            ISSUE_STATE="${{ github.event.pull_request.state }}"
+            ISSUE_ACTION="${{ github.event.action }}"
+          fi
+
+          # Codificar el título y descripción para la URL
+          CARD_NAME=$(echo "GitHub #${ISSUE_NUMBER}: ${ISSUE_TITLE}" | jq -Rr @uri)
+          CARD_DESC=$(echo "${ISSUE_BODY}" | jq -Rr @uri)
+
+          # Buscar si ya existe una tarjeta en Trello
+          CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
+            | jq -r --arg CARD_NAME "GitHub #${ISSUE_NUMBER}: ${ISSUE_TITLE}" '.[] | select(.name==$CARD_NAME) | .id')
+
+          # Si el issue es nuevo, crear la tarjeta en BACKLOG
+          if [[ "$ISSUE_ACTION" == "opened" && -z "$CARD_ID" ]]; then
+            curl -X POST "https://api.trello.com/1/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN&idList=$BACKLOG_LIST_ID&name=$CARD_NAME&desc=$CARD_DESC"
+
+          # Si el issue cambia de estado, mover la tarjeta
+          elif [[ -n "$CARD_ID" ]]; then
+            case "$ISSUE_STATE" in
+              "open") LIST_ID=$READY_LIST_ID ;;
+              "in progress") LIST_ID=$IN_PROGRESS_LIST_ID ;;
+              "review requested") LIST_ID=$IN_REVIEW_LIST_ID ;;
+              "closed") LIST_ID=$DONE_LIST_ID ;;
+            esac
+            curl -X PUT "https://api.trello.com/1/cards/$CARD_ID?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN&idList=$LIST_ID"
+          fi
