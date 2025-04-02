@@ -1,115 +1,61 @@
-name:. **Debugging Output**: Add debugging output to ensure variables are being set correctly.
-
-### Updated Workflow Step Sync GitHub Issues & PRs with Trello
+name: Sync GitHub Issues & PRs with Trello
 
 on:
   issues:
-
-Update the `.github/workflows/github-trello-sync.yml    types: [opened, edited, closed]
+    types: [opened, edited, closed]
   pull_request:
-` file to ensure variables are URL-encoded.
-
-```yaml    types: [opened, closed]
+    types: [opened, closed]
 
 jobs:
   sync_with_trello:
     runs-on: ubuntu-latest
     steps:
-      -
-name: Sync GitHub Issues & PRs with Trello
-
-on:
- name: Call Trello API to Create or Move Cards
-        env  issues:
-    types: [opened, edited, closed]
-  pull_request:
-          TRELLO_API_KEY: ${{ secrets.TRELLO_API:
-    types: [opened, closed]
-
-jobs:
-  sync_with_KEY }}
-          TRELLO_TOKEN: ${{ secrets.TRELLO_trello:
-    runs-on: ubuntu-latest
-    steps:
       - name: Call Trello API to Create or Move Cards
-        env_TOKEN }}
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
           BOARD_ID: "NbN9o1PX"
-          BACK:
-          TRELLO_API_KEY: ${{ secrets.TRELLOLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
-          READY_API_KEY }}
-          TRELLO_TOKEN: ${{ secrets.T_LIST_ID: "67e8581d93f6ede88f3eb055"
-          INRELLO_TOKEN }}
-          BOARD_ID: "NbN9o1PX"
-          BACK_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
-          INLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
-          READY_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
-          DONE_LIST_ID: "67e8581d93f6ede88f3eb055"
-          IN_LIST_ID: "67e8581d93f6ede88f3eb056"
-        run: |
-          ISSUE_TITLE="${{_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
-          IN github.event.issue.title || github.event.pull_request.title }}"
-          ISSUE_BODY="${{ github.event.issue.body || github.event.pull_request.body }}"
-          ISSUE_NUMBER="${{ github_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
-          DONE.event.issue.number || github.event.pull_request.number }}"
-          ISSUE_STATE="${{ github.event.issue.state || github.event.pull_request.state }}"
-          ISSUE_ACTION="${{ github.event.action }}"
-         _LIST_ID: "67e8581d93f6ede88f3eb056"
+          BACKLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
+          READY_LIST_ID: "67e8581d93f6ede88f3eb055"
+          IN_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
+          IN_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
+          DONE_LIST_ID: "67e8581d93f6ede88f3eb056"
         run: |
           ISSUE_TITLE="$(echo "${{ github.event.issue.title || github.event.pull_request.title }}" | jq -sRr @uri)"
-          ISSUE_BODY="$(echo "${{ github.event CARD_NAME="GitHub #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+          ISSUE_BODY="$(echo "${{ github.event.issue.body || github.event.pull_request.body }}" | jq -sRr @uri)"
+          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          ISSUE_STATE="${{ github.event.issue.state || github.event.pull_request.state }}"
+          ISSUE_ACTION="${{ github.event.action }}"
+          CARD_NAME="GitHub #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
 
-          # Debugging: Print the variables
+          # Debugging output
           echo "ISSUE_TITLE: $ISSUE_TITLE"
           echo "ISSUE_BODY: $ISSUE_BODY"
-          echo "ISSUE.issue.body || github.event.pull_request.body }}" | jq -sRr @uri)"
-          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
-          ISSUE_STATE="${{ github.event.issue.state ||_NUMBER: $ISSUE_NUMBER"
+          echo "ISSUE_NUMBER: $ISSUE_NUMBER"
           echo "ISSUE_STATE: $ISSUE_STATE"
           echo "ISSUE_ACTION: $ISSUE_ACTION"
           echo "CARD_NAME: $CARD_NAME"
 
-          github.event.pull_request.state }}"
-          ISSUE_ACTION="${{ github.event.action }}"
-          # Validate URL components before using them
-          if [[ -z "$TRELLO_API_KEY" || -z "$TRELLO CARD_NAME="GitHub #${ISSUE_NUMBER}: ${ISSUE_TOKEN" || -z "$BOARD_ID" ]]; then
-            echo "Missing required environment variables"
-            exit_TITLE}"
-
-          echo "ISSUE_TITLE: $ISSUE_TITLE"
- 1
+          # Validar que las variables necesarias están definidas
+          if [[ -z "$TRELLO_API_KEY" || -z "$TRELLO_TOKEN" || -z "$BOARD_ID" ]]; then
+            echo "❌ Faltan variables de entorno"
+            exit 1
           fi
 
-          # Buscar si ya existe una          echo "ISSUE_BODY: $ISSUE_BODY"
-          echo tarjeta en Trello
-          CARD_ID=$(curl -s " "ISSUE_NUMBER: $ISSUE_NUMBER"
-          echo "https://api.trello.com/1/boards/$BOARD_ID/cards?keyISSUE_STATE: $ISSUE_STATE"
-          echo "ISSUE_ACTION=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
-            |: $ISSUE_ACTION"
-          echo "CARD_NAME: $ jq -r --arg CARD_NAME "$CARD_NAME" '.[] | select(.CARD_NAME"
+          # Buscar si ya existe una tarjeta en Trello
+          CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
+            | jq -r --arg CARD_NAME "$CARD_NAME" '.[] | select(.name==$CARD_NAME) | .id')
 
-          # Buscar si ya existe una tarjeta enname==$CARD_NAME) | .id')
-
-          # Si el issue es Trello
-          CARD_ID=$(curl -s "https://api.t nuevo, creamos la tarjeta en BACKLOG
-          ifrello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY& [[ "$ISSUE_ACTION" == "opened" && -z "$CARD_ID" ]]; then
-            curl -X POST "https://api.trellotoken=$TRELLO_TOKEN" \
-            | jq -r --arg.com/1/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN CARD_NAME "$CARD_NAME" '.[] | select(.name==$CARD_NAME&idList=$BACKLOG_LIST_ID) | .id')
-
-          # Si el&name=$CARD_NAME&desc=$ issue es nuevo, creamosISSUE_BODY"
-
-          # Si el issue cambia de estado, la tarjeta en BACKLOG
-          if [[ "$ISSUE_ACTION movemos la tarjeta
-          elif [[ -n "$CARD_ID"" == "opened" && -z "$CARD_ID" ]]; then
-            curl - ]]; then
+          # Si el issue es nuevo, creamos la tarjeta en BACKLOG
+          if [[ "$ISSUE_ACTION" == "opened" && -z "$CARD_ID" ]]; then
+            curl -X POST "https://api.trello.com/1/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN&idList=$BACKLOG_LIST_ID&name=$CARD_NAME&desc=$ISSUE_BODY"
+          # Si el issue cambia de estado, movemos la tarjeta
+          elif [[ -n "$CARD_ID" ]]; then
             case "$ISSUE_STATE" in
               "open") LIST_ID=$READY_LIST_ID ;;
-              "inX POST "https://api.trello.com/1/cards?key=$T progress") LIST_ID=$IN_PROGRESS_LIST_ID ;;
+              "in progress") LIST_ID=$IN_PROGRESS_LIST_ID ;;
               "review requested") LIST_ID=$IN_REVIEW_LIST_ID ;;
-             RELLO_API_KEY&token=$TRELLO_TOKEN&idList=$BACKLOG_LIST "closed") LIST_ID=$DONE_LIST_ID ;;
-            es_ID&name=$CARD_NAME&desc=$ISSUE_BODY"
-
-          #ac
-            curl -X PUT "https://api.trello.com/ Si el issue cambia de estado, movemos la tarjeta
-1/cards/$CARD_ID?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN          elif [[ -n "$CARD_ID" ]]; then
-            case&idList=$LIST_ID"
+              "closed") LIST_ID=$DONE_LIST_ID ;;
+            esac
+            curl -X PUT "https://api.trello.com/1/cards/$CARD_ID?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN&idList=$LIST_ID"
           fi
