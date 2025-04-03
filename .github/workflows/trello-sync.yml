@@ -1,0 +1,61 @@
+name: Sync GitHub to Trello
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened]
+  pull_request:
+    types: [opened, closed, reopened, edited]
+
+jobs:
+  sync_to_trello:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Handle Trello Cards
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          BOARD_ID: ${{ secrets.TRELLO_BOARD_ID }}
+          BACKLOG_LIST: "65d8f7a2c6d8e8b5f4e3f5b1" # Reemplaza con tus IDs
+          DONE_LIST: "65d8f7a3c9d8e8b5f4e3f5b2"
+        run: |
+          # Configuración básica
+          IS_ISSUE=${{ github.event.issue != '' }}
+          TITLE="${{ github.event.issue.title || github.event.pull_request.title }}"
+          NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          STATE="${{ github.event.issue.state || github.event.pull_request.state }}"
+          [ "${{ github.event.pull_request.merged }}" = "true" ] && STATE="merged"
+
+          # Buscar tarjeta existente
+          CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
+                   | jq -r --arg name "GitHub #$NUMBER" '.[] | select(.name | contains($name)) | .id')
+
+          # Lógica de sincronización
+          if [ "${{ github.event.action }}" = "opened" ] && [ -z "$CARD_ID" ]; then
+            # Crear nueva tarjeta
+            curl -X POST "https://api.trello.com/1/cards" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "name": "GitHub #'$NUMBER': '"$TITLE"'",
+                "desc": "'"${{ github.event.issue.body || github.event.pull_request.body }}"'",
+                "idList": "'"$BACKLOG_LIST"'",
+                "key": "'"$TRELLO_API_KEY"'",
+                "token": "'"$TRELLO_TOKEN"'"
+              }'
+          elif [ -n "$CARD_ID" ]; then
+            # Mover tarjeta existente
+            if [ "$STATE" = "closed" ] || [ "$STATE" = "merged" ]; then
+              LIST_ID="$DONE_LIST"
+            else
+              LIST_ID="$BACKLOG_LIST"
+            fi
+            
+            curl -X PUT "https://api.trello.com/1/cards/$CARD_ID" \
+              -H "Content-Type: application/json" \
+              -d '{
+                "idList": "'"$LIST_ID"'",
+                "key": "'"$TRELLO_API_KEY"'",
+                "token": "'"$TRELLO_TOKEN"'"
+              }'
+          fi
