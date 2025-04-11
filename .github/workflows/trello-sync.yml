@@ -12,45 +12,58 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
       - name: Handle Trello Cards
         env:
           TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
           TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
           BOARD_ID: ${{ secrets.TRELLO_BOARD_ID }}
-          BACKLOG_LIST: "65d8f7a2c6d8e8b5f4e3f5b1" # Reemplaza con tus IDs
-          DONE_LIST: "65d8f7a3c9d8e8b5f4e3f5b2"
+          BACKLOG_LIST: "65d8f7a2c6d8e8b5f4e3f5b1" # Reemplaza con tu lista de backlog
+          DONE_LIST: "65d8f7a3c9d8e8b5f4e3f5b2" # Reemplaza con tu lista de tareas hechas
         run: |
-          # Configuración básica
-          IS_ISSUE=${{ github.event.issue != '' }}
-          TITLE="${{ github.event.issue.title || github.event.pull_request.title }}"
-          NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
-          STATE="${{ github.event.issue.state || github.event.pull_request.state }}"
-          [ "${{ github.event.pull_request.merged }}" = "true" ] && STATE="merged"
+          # Determinar si es issue o pull request
+          EVENT_NAME="${{ github.event_name }}"
+          if [ "$EVENT_NAME" = "issues" ]; then
+            TITLE="${{ github.event.issue.title }}"
+            BODY="${{ github.event.issue.body }}"
+            NUMBER="${{ github.event.issue.number }}"
+            STATE="${{ github.event.issue.state }}"
+          else
+            TITLE="${{ github.event.pull_request.title }}"
+            BODY="${{ github.event.pull_request.body }}"
+            NUMBER="${{ github.event.pull_request.number }}"
+            STATE="${{ github.event.pull_request.state }}"
+            if [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+              STATE="merged"
+            fi
+          fi
 
-          # Buscar tarjeta existente
+          # Buscar tarjeta existente en Trello
           CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
-                   | jq -r --arg name "GitHub #$NUMBER" '.[] | select(.name | contains($name)) | .id')
+            | jq -r --arg name "GitHub #$NUMBER" '.[] | select(.name | contains($name)) | .id')
 
-          # Lógica de sincronización
+          # Crear nueva tarjeta si no existe y el evento es 'opened'
           if [ "${{ github.event.action }}" = "opened" ] && [ -z "$CARD_ID" ]; then
-            # Crear nueva tarjeta
             curl -X POST "https://api.trello.com/1/cards" \
               -H "Content-Type: application/json" \
               -d '{
-                "name": "GitHub #'$NUMBER': '"$TITLE"'",
-                "desc": "'"${{ github.event.issue.body || github.event.pull_request.body }}"'",
+                "name": "GitHub #'"$NUMBER"': '"$TITLE"'",
+                "desc": "'"$BODY"'",
                 "idList": "'"$BACKLOG_LIST"'",
                 "key": "'"$TRELLO_API_KEY"'",
                 "token": "'"$TRELLO_TOKEN"'"
               }'
           elif [ -n "$CARD_ID" ]; then
-            # Mover tarjeta existente
+            # Determinar la lista según el estado
             if [ "$STATE" = "closed" ] || [ "$STATE" = "merged" ]; then
               LIST_ID="$DONE_LIST"
             else
               LIST_ID="$BACKLOG_LIST"
             fi
-            
+
+            # Mover la tarjeta existente
             curl -X PUT "https://api.trello.com/1/cards/$CARD_ID" \
               -H "Content-Type: application/json" \
               -d '{
