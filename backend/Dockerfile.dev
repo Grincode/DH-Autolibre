@@ -1,0 +1,13 @@
+FROM maven:3.9.6-eclipse-temurin-17-alpine
+
+WORKDIR /app
+
+COPY . .
+
+# Asegurarse que el wrapper tenga permisos
+RUN chmod +x mvnw
+
+EXPOSE 8080
+
+CMD ["./mvnw", "spring-boot:run"]
+
