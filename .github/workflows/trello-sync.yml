@@ -1,50 +1,48 @@
-name: Sync GitHub to Trello
+name: Sync GitHub Issues with Trello
 
 on:
   issues:
     types: [opened, edited, closed, reopened]
-  pull_request:
-    types: [opened, closed, reopened, edited]
 
 jobs:
-  sync_to_trello:
+  sync_with_trello:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Handle Trello Cards
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Sync issue with Trello
         env:
           TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
           TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
           BOARD_ID: ${{ secrets.TRELLO_BOARD_ID }}
-          BACKLOG_LIST_ID: ${{ secrets.BACKLOG_LIST_ID }}
-          READY_LIST_ID: ${{ secrets.READY_LIST_ID }}
-          IN_PROGRESS_LIST_ID: ${{ secrets.IN_PROGRESS_LIST_ID }}
-          IN_REVIEW_LIST_ID: ${{ secrets.IN_REVIEW_LIST_ID }}
-          DONE_LIST_ID: ${{ secrets.DONE_LIST_ID }}
+          BACKLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
+          READY_LIST_ID: "67e8581d93f6ede88f3eb055"
+          IN_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
+          IN_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
+          DONE_LIST_ID: "67e8581d93f6ede88f3eb056"
         run: |
-          # Paso 1: Obtener el último número de tarjeta en Trello
-          LAST_CARD_NUMBER=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
-            | jq -r 'map(select(.name | test("^#[0-9]+:")) | .name) | max_by(. | scan("^#([0-9]+):" ) | .[0] | tonumber) | scan("^#([0-9]+):" ) | .[0]')
-
-          # Paso 2: Si no hay ninguna tarjeta en Trello, empezamos desde #1
-          if [ -z "$LAST_CARD_NUMBER" ]; then
-            NEW_CARD_NUMBER=1
-          else
-            NEW_CARD_NUMBER=$((LAST_CARD_NUMBER + 1))  # Incrementar el número
-          fi
-
-          # Paso 3: Crear el nombre con el nuevo número
           ISSUE_TITLE="${{ github.event.issue.title }}"
           ISSUE_BODY="${{ github.event.issue.body }}"
-          CARD_NAME="#${NEW_CARD_NUMBER}: ${ISSUE_TITLE}"
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_STATE="${{ github.event.issue.state }}"
+          ISSUE_ACTION="${{ github.event.action }}"
+          CARD_NAME="#${ISSUE_NUMBER}: ${ISSUE_TITLE}"
 
-          echo "📝 Nueva tarjeta a crear: $CARD_NAME"
+          echo "📝 Título: $ISSUE_TITLE"
+          echo "📝 Estado: $ISSUE_STATE"
+          echo "📝 Acción: $ISSUE_ACTION"
+          echo "📝 Nombre de tarjeta: $CARD_NAME"
 
-          # Paso 4: Verificar si la tarjeta ya existe, si no la creamos
+          # Buscar si ya existe la tarjeta en Trello
           CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
             | jq -r --arg CARD_NAME "$CARD_NAME" '.[] | select(.name == $CARD_NAME) | .id')
 
+          # Si el issue es nuevo y no hay tarjeta existente, la creamos
           if [[ "$ISSUE_ACTION" == "opened" && -z "$CARD_ID" ]]; then
             echo "🚀 Creando nueva tarjeta en Trello..."
             curl -X POST "https://api.trello.com/1/cards" \
@@ -54,7 +52,7 @@ jobs:
               --data-urlencode "name=$CARD_NAME" \
               --data-urlencode "desc=$ISSUE_BODY"
 
-          # Si la tarjeta ya existe, la movemos a la lista correcta
+          # Si ya existe la tarjeta, la movemos según el nuevo estado
           elif [[ -n "$CARD_ID" ]]; then
             case "$ISSUE_STATE" in
               "open") LIST_ID=$READY_LIST_ID ;;
