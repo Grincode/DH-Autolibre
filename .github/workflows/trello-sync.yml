@@ -1,0 +1,70 @@
+name: Sync GitHub Issues with Trello
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened]
+
+jobs:
+  sync_with_trello:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Sync issue with Trello
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          BOARD_ID: ${{ secrets.TRELLO_BOARD_ID }}
+          BACKLOG_LIST_ID: "67e85a40c3cf1d66b18be19a"
+          READY_LIST_ID: "67e8581d93f6ede88f3eb055"
+          IN_PROGRESS_LIST_ID: "67e85e230f4199ea09bc38fb"
+          IN_REVIEW_LIST_ID: "67ed87a8705bc0ac3bc0d0ce"
+          DONE_LIST_ID: "67e8581d93f6ede88f3eb056"
+        run: |
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_BODY="${{ github.event.issue.body }}"
+          ISSUE_NUMBER="${{ github.event.issue.number }}"
+          ISSUE_STATE="${{ github.event.issue.state }}"
+          ISSUE_ACTION="${{ github.event.action }}"
+          CARD_NAME="GitHub #${ISSUE_NUMBER}: ${ISSUE_TITLE}"
+
+          echo "📝 Título: $ISSUE_TITLE"
+          echo "📝 Estado: $ISSUE_STATE"
+          echo "📝 Acción: $ISSUE_ACTION"
+          echo "📝 Nombre de tarjeta: $CARD_NAME"
+
+          # Buscar si ya existe la tarjeta en Trello
+          CARD_ID=$(curl -s "https://api.trello.com/1/boards/$BOARD_ID/cards?key=$TRELLO_API_KEY&token=$TRELLO_TOKEN" \
+            | jq -r --arg CARD_NAME "$CARD_NAME" '.[] | select(.name == $CARD_NAME) | .id')
+
+          # Si el issue es nuevo y no hay tarjeta existente, la creamos
+          if [[ "$ISSUE_ACTION" == "opened" && -z "$CARD_ID" ]]; then
+            echo "🚀 Creando nueva tarjeta en Trello..."
+            curl -X POST "https://api.trello.com/1/cards" \
+              --data-urlencode "key=$TRELLO_API_KEY" \
+              --data-urlencode "token=$TRELLO_TOKEN" \
+              --data-urlencode "idList=$BACKLOG_LIST_ID" \
+              --data-urlencode "name=$CARD_NAME" \
+              --data-urlencode "desc=$ISSUE_BODY"
+
+          # Si ya existe la tarjeta, la movemos según el nuevo estado
+          elif [[ -n "$CARD_ID" ]]; then
+            case "$ISSUE_STATE" in
+              "open") LIST_ID=$READY_LIST_ID ;;
+              "in progress") LIST_ID=$IN_PROGRESS_LIST_ID ;;
+              "review requested") LIST_ID=$IN_REVIEW_LIST_ID ;;
+              "closed") LIST_ID=$DONE_LIST_ID ;;
+              *) LIST_ID=$BACKLOG_LIST_ID ;;
+            esac
+
+            echo "🔄 Moviendo tarjeta existente a nueva lista: $LIST_ID"
+            curl -X PUT "https://api.trello.com/1/cards/$CARD_ID" \
+              --data-urlencode "key=$TRELLO_API_KEY" \
+              --data-urlencode "token=$TRELLO_TOKEN" \
+              --data-urlencode "idList=$LIST_ID"
+          fi
